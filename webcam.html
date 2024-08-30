@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webcam Stream to WebSocket</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #f0f0f0;
+            overflow: hidden;
+        }
+        video {
+        }
+    </style>
+</head>
+<body>
+    <input type="text" value="ws://192.168.101.128:3030" id="ws_link"/>
+    <button onclick="main()">Start</button>
+    <video id="video"></video>
+<script>
+
+async function main() {
+    const ws_link = document.getElementById("ws_link").value
+    const videoElement = document.getElementById('video');
+    const ws = new WebSocket(ws_link);
+    await new Promise((resolve, reject) => {
+        ws.onopen = resolve;
+    })
+    alert("Websocket Ready!")
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const config = window.constraints = {
+        audio: false,
+        video: true,
+    }
+    videoElement.setAttribute('autoplay', '');
+    videoElement.setAttribute('muted', '');
+    videoElement.setAttribute('playsinline', '')
+    videoElement.srcObject = await navigator.mediaDevices.getUserMedia(config)
+
+    canvas.width = 640;
+    canvas.height = 480;
+
+    setInterval(() => {
+        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+        ws.send(canvas.toDataURL('image/jpeg', 0.25))
+    }, 50);
+}
+</script>
+</body>
+</html>
