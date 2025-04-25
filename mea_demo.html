@@ -1,201 +1,938 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>JavaScript Sensor Access Demo</title>
-    <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <title>Demo - Camera and Sensor Access</title>
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+    />
     <style>
-        #demo-div {
-            color: lightgrey;
-            border-radius: 0.3rem;
-        }
+      /* ... (Keep previous CSS styles) ... */
+      body {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+      }
+      main {
+        margin-bottom: 60px; /* Ensure footer doesn't overlap */
+      }
+      #demo-div,
+      #camera-demo-div {
+        color: lightgrey;
+        border-radius: 0.3rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        background-color: #6c757d; /* Default background */
+      }
+      #camera-demo-div {
+        background-color: #17a2b8;
+      } /* Info color */
+      #demo-div span,
+      #demo-div #num-observed-events,
+      #camera-demo-div span {
+        color: black; /* Make text readable on colored background */
+      }
+      #demo-div,
+      #camera-demo-div,
+      #demo-div li,
+      #camera-demo-div li {
+        color: white; /* Make text readable */
+      }
+      #demo-div span,
+      #demo-div #num-observed-events {
+        color: black; /* Keep specific spans black */
+        /* background-color: #ffc107; Warning color for badge */
+        padding: 0.25em 0.4em;
+        border-radius: 0.25rem;
+      }
 
-        #demo-div span,
-        #demo-div #num-observed-events {
-            color: black;
-        }
+      h1 {
+        margin-top: 0.5rem;
+        margin-bottom: 1rem;
+      }
+      h4 {
+        margin-top: 0.66rem;
+        font-size: 1.33rem;
+        color: white;
+      } /* White headings */
+      #demo-div ul,
+      #camera-demo-div ul {
+        margin-bottom: 0.66rem;
+        list-style: none;
+        padding-left: 0;
+      }
+      #demo-div li,
+      #camera-demo-div li {
+        line-height: 21px;
+      }
 
-        h1 {
-            margin-top: 0.5rem;
-        }
-
-        h4 {
-            margin-top: 0.66rem;
-            font-size: 1.33rem;
-        }
-
-        #demo-div li {
-            line-height: 21px;
-        }
-
-        #demo-div ul {
-            margin-bottom: 0.66rem;
-        }
-
-        /* Style for the camera stream */
-        #camera-stream {
-            width: 100%;
-            max-width: 640px;
-            border: 1px solid black;
-        }
+      .footer {
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+        height: 60px;
+        line-height: 60px;
+        background-color: #f5f5f5;
+        z-index: 1000; /* Ensure footer is on top */
+      }
+      #video-canvas {
+        max-width: 100%;
+        height: auto;
+        border: 1px solid black;
+        background-color: #222;
+        display: block;
+        margin-top: 10px;
+      }
+      #video-feed {
+        display: none;
+      }
+      .btn {
+        margin-right: 5px;
+        margin-bottom: 10px;
+      }
+      #camera-error,
+      #sensor-error {
+        /* Style for error messages */
+        color: #dc3545; /* Danger color */
+        background-color: #f8d7da; /* Light red background */
+        border: 1px solid #f5c6cb;
+        padding: 0.75rem 1.25rem;
+        border-radius: 0.25rem;
+        margin-top: 10px;
+        color: black; /* Ensure text is readable */
+      }
+      label {
+        color: white;
+        margin-bottom: 0.5rem;
+      }
     </style>
-</head>
-<body>
-<main role="main" class="container">
+  </head>
+  <body>
+    <main role="main" class="container">
+      <h1>JavaScript Camera and Sensor Access Demo</h1>
+      <p>
+        <b
+          >Camera access works on desktops/mobiles (requires HTTPS or
+          localhost). Sensor data requires a mobile phone or tablet. Remember to
+          grant permissions when prompted.</b
+        >
+      </p>
 
-    <h1 align="left">JavaScript Sensor Access Demo</h1>
-    <p><b>This demo page should be run from a mobile phone or a tablet.</b></p>
-    <p><i>deviceorientation</i> provides <i>alpha</i>, <i>beta</i> and <i>gamma</i> components which correspond to orientation along the Z, X and Y axes, respectively.</p>
-    <p><i>devicemotion</i> provides acceleration and rotation rate along three axes using MEMS accelerometers and gyroscopes.</p>
+      <!-- Camera Demo Section -->
+      <div class="p-3 mb-2" id="camera-demo-div">
+        <h4>Camera Demo</h4>
+        <div id="camera-controls">
+          <label for="camera-select">Select Camera:</label>
+          <!-- Start disabled, populated after permission -->
+          <select
+            id="camera-select"
+            class="form-control mb-2"
+            disabled
+          ></select>
+          <!-- Button initially asks for permission, then starts/stops -->
+          <button id="start-camera" class="btn btn-md py-1 btn-primary">
+            Initialize Camera & Grant Permission
+          </button>
+        </div>
+        <div>
+          <video id="video-feed" playsinline autoplay muted></video>
+          <canvas id="video-canvas"></canvas>
+        </div>
+        <p id="camera-error" style="display: none"></p>
+      </div>
 
-    <p>The sensor data shown below does not leave your browser: it is not collected, shared or transmitted. However this may not be true for other websites that you visit. For more information, see the companion page for our study:
-        <a href="https://sensor-js.xyz/">"The Web's Sixth Sense: A Study of Scripts Accessing Smartphone Sensors"</a>.</p>
+      <!-- Sensor Demo Section -->
+      <div class="p-3 mb-2" id="demo-div">
+        <!-- ... (Sensor HTML remains the same) ... -->
+        <h4>Sensor Demo</h4>
+        <div id="sensor-controls">
+          <button
+            id="start_demo"
+            class="btn btn-md py-1 btn-success"
+            href="#"
+            role="button"
+            disabled
+          >
+            Start Sensor Demo
+          </button>
+          <!-- Start disabled -->
+          <p style="margin-top: 1rem; display: inline-block; margin-left: 15px">
+            Sensor Datapoints:
+            <span class="badge badge-warning" id="num-observed-events">0</span>
+          </p>
+        </div>
+        <p id="sensor-error" style="display: none"></p>
+        <!-- Hidden initially -->
 
-    <div class="p-3 mb-2 bg-secondary" id="demo-div">
-        <a id="start_demo" class="btn btn-lg py-1 btn-success" href="#" role="button">Start demo</a>
-        <p style="margin-top:1rem;">Num. of datapoints: <span class="badge badge-warning" id="num-observed-events">0</span></p>
-
-        <!-- Camera Stream Element -->
-        <h4>Camera Stream</h4>
-        <video id="camera-stream" autoplay playsinline></video>
-
-        <h4 style="margin-top:0.75rem;">Orientation</h4>
-        <ul>
+        <div id="sensor-readings" style="display: none">
+          <!-- Hide readings until started -->
+          <h4 style="margin-top: 0.75rem">Orientation</h4>
+          <ul>
             <li>X-axis (β): <span id="Orientation_b">0</span><span>°</span></li>
             <li>Y-axis (γ): <span id="Orientation_g">0</span><span>°</span></li>
             <li>Z-axis (α): <span id="Orientation_a">0</span><span>°</span></li>
-        </ul>
+          </ul>
 
-        <h4>Accelerometer</h4>
-        <ul>
-            <li>X-axis: <span id="Accelerometer_x">0</span><span> m/s<sup>2</sup></span></li>
-            <li>Y-axis: <span id="Accelerometer_y">0</span><span> m/s<sup>2</sup></span></li>
-            <li>Z-axis: <span id="Accelerometer_z">0</span><span> m/s<sup>2</sup></span></li>
-            <li>Data Interval: <span id="Accelerometer_i">0</span><span> ms</span></li>
-        </ul>
+          <h4>Accelerometer</h4>
+          <ul>
+            <li>
+              X-axis: <span id="Accelerometer_x">0</span
+              ><span> m/s<sup>2</sup></span>
+            </li>
+            <li>
+              Y-axis: <span id="Accelerometer_y">0</span
+              ><span> m/s<sup>2</sup></span>
+            </li>
+            <li>
+              Z-axis: <span id="Accelerometer_z">0</span
+              ><span> m/s<sup>2</sup></span>
+            </li>
+            <li>
+              Data Interval: <span id="Accelerometer_i">0</span><span> ms</span>
+            </li>
+          </ul>
 
-        <h4>Accelerometer including gravity</h4>
+          <h4>Accelerometer including gravity</h4>
+          <ul>
+            <li>
+              X-axis: <span id="Accelerometer_gx">0</span
+              ><span> m/s<sup>2</sup></span>
+            </li>
+            <li>
+              Y-axis: <span id="Accelerometer_gy">0</span
+              ><span> m/s<sup>2</sup></span>
+            </li>
+            <li>
+              Z-axis: <span id="Accelerometer_gz">0</span
+              ><span> m/s<sup>2</sup></span>
+            </li>
+          </ul>
 
-        <ul>
-            <li>X-axis: <span id="Accelerometer_gx">0</span><span> m/s<sup>2</sup></span></li>
-            <li>Y-axis: <span id="Accelerometer_gy">0</span><span> m/s<sup>2</sup></span></li>
-            <li>Z-axis: <span id="Accelerometer_gz">0</span><span> m/s<sup>2</sup></span></li>
-        </ul>
-
-        <h4>Gyroscope</h4>
-        <ul>
+          <h4>Gyroscope</h4>
+          <ul>
             <li>X-axis: <span id="Gyroscope_x">0</span><span>°/s</span></li>
             <li>Y-axis: <span id="Gyroscope_y">0</span><span>°/s</span></li>
             <li>Z-axis: <span id="Gyroscope_z">0</span><span>°/s</span></li>
-        </ul>
+          </ul>
+        </div>
+      </div>
+    </main>
 
-    </div>
-</main>
-<footer class="footer">
-    <div class="container">
-        <span class="text-muted small">This page is hosted on GitHub Pages, please see GitHub's privacy statement
-            <a href="https://help.github.com/articles/github-privacy-statement/">here</a>.</span>
-    </div>
-</footer>
-<script>
-    // Function to handle camera access and stream
-    async function startCamera() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            const videoElement = document.getElementById('camera-stream');
-            videoElement.srcObject = stream;
-        } catch (error) {
-            console.error("Error accessing the camera:", error);
+    <footer class="footer">
+      <!-- ... (Footer HTML remains the same) ... -->
+      <div class="container">
+        <span class="text-muted small"
+          >Camera/Sensor data is processed locally. GitHub privacy
+          <a href="https://help.github.com/articles/github-privacy-statement/"
+            >here</a
+          >.</span
+        >
+      </div>
+    </footer>
+
+    <script>
+      // --- Utility Functions ---
+      function log(message) {
+        console.log(`[Demo] ${message}`);
+      }
+      function errorLog(message, err) {
+        console.error(`[Demo Error] ${message}`, err);
+      }
+      function displayError(elementId, message) {
+        const errorEl = document.getElementById(elementId);
+        if (errorEl) {
+          errorEl.textContent = message;
+          errorEl.style.display = "block";
         }
-    }
+      }
+      function clearError(elementId) {
+        const errorEl = document.getElementById(elementId);
+        if (errorEl) {
+          errorEl.textContent = "";
+          errorEl.style.display = "none";
+        }
+      }
 
-    function handleOrientation(event) {
-        updateFieldIfNotNull('Orientation_a', event.alpha);
-        updateFieldIfNotNull('Orientation_b', event.beta);
-        updateFieldIfNotNull('Orientation_g', event.gamma);
-        incrementEventCount();
-    }
+      // --- Camera Code ---
+      const videoElement = document.getElementById("video-feed");
+      const canvasElement = document.getElementById("video-canvas");
+      const cameraSelect = document.getElementById("camera-select");
+      const startCameraButton = document.getElementById("start-camera");
+      const cameraErrorContainer = "camera-error";
 
-    function incrementEventCount() {
-        let counterElement = document.getElementById("num-observed-events")
-        let eventCount = parseInt(counterElement.innerHTML)
-        counterElement.innerHTML = eventCount + 1;
-    }
+      let canvasCtx = null;
+      let currentStream = null;
+      let animationFrameId = null;
+      let isCameraRunning = false;
+      let hasCameraPermission = false; // Track permission state
 
-    function updateFieldIfNotNull(fieldName, value, precision = 10) {
-        if (value != null)
-            document.getElementById(fieldName).innerHTML = value.toFixed(precision);
-    }
-
-    function handleMotion(event) {
-        updateFieldIfNotNull('Accelerometer_gx', event.accelerationIncludingGravity.x);
-        updateFieldIfNotNull('Accelerometer_gy', event.accelerationIncludingGravity.y);
-        updateFieldIfNotNull('Accelerometer_gz', event.accelerationIncludingGravity.z);
-
-        updateFieldIfNotNull('Accelerometer_x', event.acceleration.x);
-        updateFieldIfNotNull('Accelerometer_y', event.acceleration.y);
-        updateFieldIfNotNull('Accelerometer_z', event.acceleration.z);
-
-        updateFieldIfNotNull('Accelerometer_i', event.interval, 2);
-
-        updateFieldIfNotNull('Gyroscope_z', event.rotationRate.alpha);
-        updateFieldIfNotNull('Gyroscope_x', event.rotationRate.beta);
-        updateFieldIfNotNull('Gyroscope_y', event.rotationRate.gamma);
-        incrementEventCount();
-    }
-
-    let is_running = false;
-    let demo_button = document.getElementById("start_demo");
-    demo_button.onclick = function (e) {
-        e.preventDefault();
-
-        // Request permission for iOS 13+ devices
+      // --- Camera Functions (drawFrame, stopCameraStream remain largely the same) ---
+      function drawFrame() {
         if (
-            DeviceMotionEvent &&
-            typeof DeviceMotionEvent.requestPermission === "function"
+          !isCameraRunning ||
+          !videoElement ||
+          videoElement.paused ||
+          videoElement.ended ||
+          !canvasElement ||
+          !canvasCtx
         ) {
-            DeviceMotionEvent.requestPermission();
+          if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+          }
+          return;
+        }
+        try {
+          if (
+            canvasElement.width !== videoElement.videoWidth ||
+            canvasElement.height !== videoElement.videoHeight
+          ) {
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+            canvasCtx.font = "14px Arial";
+            canvasCtx.textAlign = "center";
+            canvasCtx.textBaseline = "middle";
+          }
+          canvasCtx.drawImage(
+            videoElement,
+            0,
+            0,
+            canvasElement.width,
+            canvasElement.height
+          );
+          const centerX = canvasElement.width / 2;
+          const centerY = canvasElement.height / 2;
+          const radius = Math.max(
+            2,
+            Math.min(5, canvasElement.width / 100, canvasElement.height / 100)
+          );
+          canvasCtx.beginPath();
+          canvasCtx.arc(centerX, centerY, radius, 0, 2 * Math.PI, false);
+          canvasCtx.fillStyle = "red";
+          canvasCtx.fill();
+          animationFrameId = requestAnimationFrame(drawFrame);
+        } catch (err) {
+          errorLog("Error during drawFrame:", err);
+          displayError(
+            cameraErrorContainer,
+            `Error drawing frame: ${err.message}`
+          );
+          stopCameraStream();
+        }
+      }
+
+      function stopCameraStream() {
+        log("Stopping camera stream...");
+        isCameraRunning = false;
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+        }
+        if (currentStream) {
+          currentStream.getTracks().forEach((track) => track.stop());
+          currentStream = null;
+        }
+        if (videoElement) {
+          videoElement.srcObject = null;
+          videoElement.pause();
+          videoElement.removeAttribute("src");
+        }
+        if (canvasCtx && canvasElement) {
+          canvasCtx.fillStyle = "#555";
+          canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+          canvasCtx.fillStyle = "white";
+          if (canvasElement.width > 0 && canvasElement.height > 0) {
+            canvasCtx.fillText(
+              "Camera stopped.",
+              canvasElement.width / 2,
+              canvasElement.height / 2
+            );
+          }
+        }
+        if (startCameraButton && hasCameraPermission) {
+          // Only reset to 'Start' if permission was granted
+          startCameraButton.textContent = "Start Camera";
+          startCameraButton.classList.remove("btn-danger");
+          startCameraButton.classList.add("btn-success"); // Make it green for starting again
+          startCameraButton.disabled = false;
+        }
+        if (cameraSelect) {
+          cameraSelect.disabled = false;
+        } // Re-enable selection when stopped
+        clearError(cameraErrorContainer);
+        log("Camera stream stopped.");
+      }
+
+      // Function to populate the camera select dropdown (now expects labels)
+      async function populateCameraList(selectedDeviceId = null) {
+        log("Populating camera list...");
+        if (!cameraSelect) {
+          errorLog("Camera select element not found.");
+          return;
         }
 
-        if (is_running) {
-            window.removeEventListener("devicemotion", handleMotion);
-            window.removeEventListener("deviceorientation", handleOrientation);
-            demo_button.innerHTML = "Start demo";
-            demo_button.classList.add('btn-success');
-            demo_button.classList.remove('btn-danger');
-            is_running = false;
+        if (
+          !navigator.mediaDevices ||
+          !navigator.mediaDevices.enumerateDevices
+        ) {
+          log("enumerateDevices() not supported.");
+          displayError(
+            cameraErrorContainer,
+            "Browser does not support listing media devices."
+          );
+          return; // Keep controls disabled
+        }
+
+        try {
+          // *** Get list of media devices ***
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          log(`Found ${devices.length} media devices.`);
+
+          // Clear existing options
+          cameraSelect.innerHTML = "";
+          let cameraCount = 0;
+          let defaultOption = document.createElement("option");
+          defaultOption.value = "";
+          defaultOption.textContent = "-- Select Camera --";
+          cameraSelect.appendChild(defaultOption);
+
+          devices.forEach((device) => {
+            if (device.kind === "videoinput") {
+              cameraCount++;
+              const option = document.createElement("option");
+              option.value = device.deviceId;
+              // Labels should be available now if permission was granted
+              option.textContent =
+                device.label ||
+                `Camera ${cameraCount} (ID: ${device.deviceId.substring(
+                  0,
+                  8
+                )}...)`;
+              cameraSelect.appendChild(option);
+              log(
+                `Added camera: ${option.textContent} (ID: ${device.deviceId})`
+              );
+            }
+          });
+
+          if (cameraCount === 0) {
+            log("No video input devices found after permission.");
+            displayError(
+              cameraErrorContainer,
+              "No cameras found on this device."
+            );
+            cameraSelect.disabled = true;
+            startCameraButton.disabled = true; // Keep disabled if no cameras
+            startCameraButton.textContent = "No Cameras Found";
+            startCameraButton.classList.remove(
+              "btn-primary",
+              "btn-success",
+              "btn-danger"
+            );
+            startCameraButton.classList.add("btn-secondary");
+          } else {
+            log(`Found ${cameraCount} cameras. Enabling controls.`);
+            cameraSelect.disabled = false;
+            startCameraButton.disabled = false; // Enable the button fully now
+            startCameraButton.textContent = "Start Camera"; // Set text for starting
+            startCameraButton.classList.remove("btn-primary"); // Remove initial blue
+            startCameraButton.classList.add("btn-success"); // Set to green for start
+
+            // Try to re-select the previously selected device if provided
+            if (selectedDeviceId) {
+              cameraSelect.value = selectedDeviceId;
+              // If the value didn't stick (e.g., device disappeared), reset to default
+              if (cameraSelect.value !== selectedDeviceId) {
+                cameraSelect.selectedIndex = 0;
+              }
+            } else {
+              cameraSelect.selectedIndex = 0; // Default to placeholder
+            }
+          }
+        } catch (err) {
+          errorLog("Error enumerating devices after permission:", err);
+          displayError(
+            cameraErrorContainer,
+            `Error listing cameras: ${err.message}.`
+          );
+          cameraSelect.disabled = true; // Disable on error
+          startCameraButton.disabled = true;
+          startCameraButton.textContent = "Error Listing Cameras";
+          startCameraButton.classList.remove(
+            "btn-primary",
+            "btn-success",
+            "btn-danger"
+          );
+          startCameraButton.classList.add("btn-secondary");
+        }
+      }
+
+      // Function to request permission and populate list
+      async function initializeCamera() {
+        log("Initializing camera: Requesting permission...");
+        clearError(cameraErrorContainer);
+        startCameraButton.disabled = true;
+        startCameraButton.textContent = "Requesting Permission...";
+
+        // 1. Request Permission using a temporary stream
+        let tempStream = null;
+        try {
+          // Use basic constraints just to trigger the prompt
+          tempStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+          log("Camera permission granted.");
+          hasCameraPermission = true;
+
+          // IMPORTANT: Stop the tracks of the temporary stream immediately
+          tempStream.getTracks().forEach((track) => track.stop());
+          log("Temporary stream tracks stopped.");
+
+          // 2. Now Populate the list with labels
+          await populateCameraList(); // This will enable controls if cameras are found
+        } catch (err) {
+          errorLog("Error getting camera permission:", err);
+          hasCameraPermission = false;
+          let userMessage = `Could not get camera permission: ${err.name}. `;
+          if (
+            err.name === "NotAllowedError" ||
+            err.name === "PermissionDeniedError"
+          ) {
+            userMessage +=
+              "Permission denied. Please allow camera access in browser/OS settings.";
+          } else if (
+            err.name === "NotFoundError" ||
+            err.name === "DevicesNotFoundError"
+          ) {
+            userMessage += "No camera found.";
+          } else {
+            userMessage += ` Check console for details. (${err.message})`;
+          }
+          displayError(cameraErrorContainer, userMessage);
+          // Reset button to initial state but keep it disabled as init failed
+          startCameraButton.textContent = "Permission Denied / Error";
+          startCameraButton.classList.remove(
+            "btn-primary",
+            "btn-success",
+            "btn-danger"
+          );
+          startCameraButton.classList.add("btn-secondary");
+          startCameraButton.disabled = true;
+          cameraSelect.disabled = true;
+        }
+      }
+
+      // Function to start the actual camera stream (called AFTER permission is granted)
+      async function startActiveCameraStream() {
+        log("Attempting to start ACTIVE camera stream...");
+        if (!hasCameraPermission) {
+          log("Cannot start stream, permission not granted.");
+          displayError(
+            cameraErrorContainer,
+            "Camera permission has not been granted."
+          );
+          return;
+        }
+        if (
+          !videoElement ||
+          !canvasElement ||
+          !cameraSelect ||
+          !startCameraButton
+        ) {
+          errorLog(
+            "Required camera HTML elements not found for active stream."
+          );
+          return;
+        }
+        if (isCameraRunning) {
+          log("Camera already running.");
+          return;
+        } // Should be handled by button state, but double-check
+
+        clearError(cameraErrorContainer);
+        startCameraButton.disabled = true;
+        startCameraButton.textContent = "Starting...";
+        cameraSelect.disabled = true; // Disable selection while stream is active
+
+        const selectedDeviceId = cameraSelect.value;
+        if (!selectedDeviceId) {
+          log("No camera selected.");
+          displayError(
+            cameraErrorContainer,
+            "Please select a camera from the list."
+          );
+          startCameraButton.disabled = false; // Re-enable button
+          startCameraButton.textContent = "Start Camera";
+          cameraSelect.disabled = false; // Re-enable select
+          return;
+        }
+        log(`Starting stream for selected deviceId: ${selectedDeviceId}`);
+
+        const constraints = {
+          video: { deviceId: { exact: selectedDeviceId } },
+          audio: false,
+        };
+
+        try {
+          log("Requesting user media for selected device:", constraints);
+          currentStream = await navigator.mediaDevices.getUserMedia(
+            constraints
+          );
+          log("Active media stream obtained.");
+
+          videoElement.srcObject = currentStream;
+          await videoElement.play();
+          log("Video element playing active stream.");
+
+          if (!canvasCtx) {
+            canvasCtx = canvasElement.getContext("2d");
+          }
+          if (!canvasCtx) {
+            throw new Error("Could not get 2D context.");
+          }
+
+          canvasElement.width = videoElement.videoWidth;
+          canvasElement.height = videoElement.videoHeight;
+          log(
+            `Canvas size set to active video dimensions: ${canvasElement.width}x${canvasElement.height}`
+          );
+          canvasCtx.font = "14px Arial";
+          canvasCtx.textAlign = "center";
+          canvasCtx.textBaseline = "middle";
+
+          isCameraRunning = true;
+          startCameraButton.textContent = "Stop Camera";
+          startCameraButton.classList.remove("btn-success");
+          startCameraButton.classList.add("btn-danger");
+          startCameraButton.disabled = false;
+
+          log("Starting draw frame loop for active stream...");
+          drawFrame();
+        } catch (err) {
+          errorLog("Error starting active camera stream:", err);
+          let userMessage = `Could not start camera: ${err.name}. `;
+          // Add specific error messages as before
+          if (
+            err.name === "NotFoundError" ||
+            err.name === "DevicesNotFoundError"
+          ) {
+            userMessage += "Selected camera not found.";
+          } else if (
+            err.name === "NotAllowedError" ||
+            err.name === "PermissionDeniedError"
+          ) {
+            userMessage += "Permission denied.";
+          } else if (
+            err.name === "NotReadableError" ||
+            err.name === "TrackStartError"
+          ) {
+            userMessage += "Camera in use or hardware error.";
+          } else if (
+            err.name === "OverconstrainedError" ||
+            err.name === "ConstraintNotSatisfiedError"
+          ) {
+            userMessage += "Constraints not supported.";
+          } else {
+            userMessage += ` Check console. (${err.message})`;
+          }
+          displayError(cameraErrorContainer, userMessage);
+          stopCameraStream(); // Clean up
+          // Reset button to a 'startable' state if appropriate
+          if (hasCameraPermission) {
+            startCameraButton.textContent = "Start Camera";
+            startCameraButton.classList.remove("btn-danger");
+            startCameraButton.classList.add("btn-success");
+            startCameraButton.disabled = false;
+            cameraSelect.disabled = false;
+          }
+        }
+      }
+
+      // --- Sensor Code (remains the same as previous version) ---
+      let is_sensor_running = false;
+      const demo_button = document.getElementById("start_demo");
+      const num_observed_events_el = document.getElementById(
+        "num-observed-events"
+      );
+      const sensorReadingsDiv = document.getElementById("sensor-readings");
+      const sensorErrorContainer = "sensor-error"; // ID of the error paragraph
+
+      function updateFieldIfNotNull(fieldName, value, precision = 5) {
+        if (value != null) {
+          const field = document.getElementById(fieldName);
+          if (field) {
+            field.innerHTML = value.toFixed(precision);
+          }
+        }
+      }
+      function incrementEventCount() {
+        if (!num_observed_events_el) return;
+        num_observed_events_el.innerHTML =
+          parseInt(num_observed_events_el.innerHTML) + 1;
+      }
+      function handleOrientation(event) {
+        updateFieldIfNotNull("Orientation_a", event.alpha);
+        updateFieldIfNotNull("Orientation_b", event.beta);
+        updateFieldIfNotNull("Orientation_g", event.gamma);
+        incrementEventCount();
+      }
+      function handleMotion(event) {
+        updateFieldIfNotNull(
+          "Accelerometer_gx",
+          event.accelerationIncludingGravity?.x
+        );
+        updateFieldIfNotNull(
+          "Accelerometer_gy",
+          event.accelerationIncludingGravity?.y
+        );
+        updateFieldIfNotNull(
+          "Accelerometer_gz",
+          event.accelerationIncludingGravity?.z
+        );
+        updateFieldIfNotNull("Accelerometer_x", event.acceleration?.x);
+        updateFieldIfNotNull("Accelerometer_y", event.acceleration?.y);
+        updateFieldIfNotNull("Accelerometer_z", event.acceleration?.z);
+        updateFieldIfNotNull("Accelerometer_i", event.interval, 2);
+        updateFieldIfNotNull("Gyroscope_z", event.rotationRate?.alpha);
+        updateFieldIfNotNull("Gyroscope_x", event.rotationRate?.beta);
+        updateFieldIfNotNull("Gyroscope_y", event.rotationRate?.gamma);
+        incrementEventCount();
+      }
+      function requestSensorPermissionsAndStart() {
+        log("Requesting sensor permissions (iOS 13+)...");
+        clearError(sensorErrorContainer);
+        const requestMotion = () =>
+          typeof DeviceMotionEvent !== "undefined" &&
+          typeof DeviceMotionEvent.requestPermission === "function"
+            ? DeviceMotionEvent.requestPermission()
+            : Promise.resolve("granted");
+        const requestOrientation = () =>
+          typeof DeviceOrientationEvent !== "undefined" &&
+          typeof DeviceOrientationEvent.requestPermission === "function"
+            ? DeviceOrientationEvent.requestPermission()
+            : Promise.resolve("granted");
+        Promise.all([requestMotion(), requestOrientation()])
+          .then((results) => {
+            const motionState = results[0];
+            const orientationState = results[1];
+            log(
+              `Sensor Permission states: Motion=${motionState}, Orientation=${orientationState}`
+            );
+            if (motionState === "granted" || orientationState === "granted") {
+              log("Sensor permission granted.");
+              startSensorListeners();
+            } else {
+              log("Sensor permission denied.");
+              displayError(sensorErrorContainer, "Sensor permission denied.");
+              stopSensorListeners(true);
+            }
+          })
+          .catch((error) => {
+            errorLog("Error requesting sensor permissions:", error);
+            displayError(
+              sensorErrorContainer,
+              `Error requesting sensor permissions: ${error.message}`
+            );
+            stopSensorListeners(true);
+          });
+      }
+      function startSensorListeners() {
+        if (is_sensor_running) {
+          log("Sensor listeners already running.");
+          return;
+        }
+        log("Starting sensor listeners...");
+        clearError(sensorErrorContainer);
+        let motionListenerAdded = false;
+        let orientationListenerAdded = false;
+        try {
+          if (typeof DeviceMotionEvent !== "undefined") {
+            window.addEventListener("devicemotion", handleMotion, true);
+            motionListenerAdded = true;
+            log("Added devicemotion listener.");
+          } else {
+            log("DeviceMotionEvent not supported.");
+          }
+          if (typeof DeviceOrientationEvent !== "undefined") {
+            window.addEventListener(
+              "deviceorientation",
+              handleOrientation,
+              true
+            );
+            orientationListenerAdded = true;
+            log("Added deviceorientation listener.");
+          } else {
+            log("DeviceOrientationEvent not supported.");
+          }
+          if (motionListenerAdded || orientationListenerAdded) {
+            if (sensorReadingsDiv) sensorReadingsDiv.style.display = "block";
+            if (demo_button) {
+              demo_button.innerHTML = "Stop Sensor Demo";
+              demo_button.classList.remove("btn-success");
+              demo_button.classList.add("btn-danger");
+            }
+            is_sensor_running = true;
+            log("Sensor listeners started successfully.");
+          } else {
+            log("No sensor listeners could be added.");
+            displayError(
+              sensorErrorContainer,
+              "No compatible sensors found/supported."
+            );
+            stopSensorListeners(true);
+          }
+        } catch (err) {
+          errorLog("Error adding sensor listeners:", err);
+          displayError(
+            sensorErrorContainer,
+            `Failed to start sensors: ${err.message}`
+          );
+          stopSensorListeners(true);
+        }
+      }
+      function stopSensorListeners(force_ui_reset = false) {
+        if (!is_sensor_running && !force_ui_reset) return;
+        log("Stopping sensor listeners...");
+        window.removeEventListener("devicemotion", handleMotion, true);
+        window.removeEventListener(
+          "deviceorientation",
+          handleOrientation,
+          true
+        );
+        if (sensorReadingsDiv) sensorReadingsDiv.style.display = "none";
+        if (demo_button) {
+          demo_button.innerHTML = "Start Sensor Demo";
+          demo_button.classList.add("btn-success");
+          demo_button.classList.remove("btn-danger");
+        }
+        is_sensor_running = false;
+        clearError(sensorErrorContainer);
+        log("Sensor listeners stopped.");
+      }
+
+      // --- Initialization ---
+      document.addEventListener("DOMContentLoaded", () => {
+        log("DOM Content Loaded. Initializing...");
+
+        // --- Camera Init ---
+        if (canvasElement) {
+          canvasCtx = canvasElement.getContext("2d");
+          if (canvasCtx) {
+            canvasElement.width = 320;
+            canvasElement.height = 240;
+            canvasCtx.fillStyle = "#555";
+            canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.fillStyle = "white";
+            canvasCtx.font = "14px Arial";
+            canvasCtx.textAlign = "center";
+            canvasCtx.textBaseline = "middle";
+            canvasCtx.fillText(
+              "Initialize camera to see feed",
+              canvasElement.width / 2,
+              canvasElement.height / 2
+            );
+            log("Initial canvas placeholder drawn.");
+          } else {
+            errorLog("Failed to get 2D context.");
+            displayError(cameraErrorContainer, "Failed to initialize canvas.");
+          }
         } else {
-            window.addEventListener("devicemotion", handleMotion);
-            window.addEventListener("deviceorientation", handleOrientation);
-            document.getElementById("start_demo").innerHTML = "Stop demo";
-            demo_button.classList.remove('btn-success');
-            demo_button.classList.add('btn-danger');
-            is_running = true;
-
-            // Start the camera when the demo starts
-            startCamera();
+          errorLog("Canvas element not found.");
+          displayError(cameraErrorContainer, "Canvas element missing.");
         }
-    };
 
-    /*
-    Light and proximity are not supported anymore by mainstream browsers.
-    window.addEventListener('devicelight', function(e) {
-       document.getElementById("DeviceLight").innerHTML="AmbientLight current Value: "+e.value+" Max: "+e.max+" Min: "+e.min;
-    });
+        // Add initial placeholder to select list
+        if (cameraSelect) {
+          let defaultOption = document.createElement("option");
+          defaultOption.value = "";
+          defaultOption.textContent = "-- Grant Permission First --";
+          cameraSelect.appendChild(defaultOption);
+        }
 
-    window.addEventListener('lightlevel', function(e) {
-       document.getElementById("Lightlevel").innerHTML="Light level: "+e.value;
-    });
+        // Attach camera button listener (handles both init and start/stop)
+        if (startCameraButton) {
+          startCameraButton.addEventListener("click", () => {
+            log("Camera button clicked.");
+            if (!hasCameraPermission) {
+              // First click: Initialize and get permission
+              initializeCamera();
+            } else if (isCameraRunning) {
+              // If running: Stop the stream
+              stopCameraStream();
+            } else {
+              // If permission granted but not running: Start the active stream
+              startActiveCameraStream();
+            }
+          });
+          // Check if getUserMedia itself is supported
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            log("getUserMedia not supported.");
+            displayError(
+              cameraErrorContainer,
+              "Camera access (getUserMedia) is not supported by this browser."
+            );
+            startCameraButton.disabled = true;
+            startCameraButton.textContent = "Camera Not Supported";
+            startCameraButton.classList.remove("btn-primary");
+            startCameraButton.classList.add("btn-secondary");
+          } // Button remains enabled otherwise, waiting for first click
+        } else {
+          errorLog("Start Camera button not found.");
+        }
 
-    window.addEventListener('deviceproximity', function(e) {
-       document.getElementById("DeviceProximity").innerHTML="DeviceProximity current Value: "+e.value+" Max: "+e.max+" Min: "+e.min;
-    });
+        // --- Sensor Init (remains the same) ---
+        if (demo_button) {
+          const motionSupport = typeof DeviceMotionEvent !== "undefined";
+          const orientationSupport =
+            typeof DeviceOrientationEvent !== "undefined";
+          log(
+            `Sensor Support: Motion=${motionSupport}, Orientation=${orientationSupport}`
+          );
+          if (!motionSupport && !orientationSupport) {
+            displayError(
+              sensorErrorContainer,
+              "Motion/Orientation sensors not supported."
+            );
+            demo_button.disabled = true;
+            demo_button.innerHTML = "Sensors Unavailable";
+            demo_button.classList.remove("btn-success");
+            demo_button.classList.add("btn-secondary");
+          } else {
+            demo_button.disabled = false;
+            log("Sensor demo button enabled.");
+            demo_button.addEventListener("click", (e) => {
+              e.preventDefault();
+              log("Start/Stop Sensor button clicked.");
+              if (is_sensor_running) {
+                stopSensorListeners();
+              } else {
+                const needsMotionPerm =
+                  motionSupport &&
+                  typeof DeviceMotionEvent.requestPermission === "function";
+                const needsOrientationPerm =
+                  orientationSupport &&
+                  typeof DeviceOrientationEvent.requestPermission ===
+                    "function";
+                if (needsMotionPerm || needsOrientationPerm) {
+                  requestSensorPermissionsAndStart();
+                } else {
+                  startSensorListeners();
+                }
+              }
+            });
+          }
+        } else {
+          errorLog("Sensor demo button ('start_demo') not found.");
+          displayError(sensorErrorContainer, "Sensor start button missing.");
+        }
 
-    window.addEventListener('userproximity', function(event) {
-       document.getElementById("UserProximity").innerHTML="UserProximity: "+event.near;
-    });
-    */
-</script>
-</body>
+        log("Initialization complete.");
+      });
+    </script>
+  </body>
 </html>
